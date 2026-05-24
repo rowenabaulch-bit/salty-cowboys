@@ -1,0 +1,1264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#2a1f14" />
+  <title>Salty Cowboys · Book your experience</title>
+  <meta name="description" content="Book a horse riding experience at Salty Cowboys — Bali horse rescue sanctuary & riding centre." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <style>
+    html, body { margin: 0; padding: 0; background: #0e0b08; -webkit-text-size-adjust: 100%; }
+    #loading {
+      position: fixed; inset: 0;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: #2a1f14; color: #f5ede0;
+      font-family: Georgia, 'Times New Roman', serif; gap: 14px;
+    }
+    #loading .spinner {
+      width: 34px; height: 34px; border-radius: 50%;
+      border: 2.5px solid rgba(245,237,224,0.18);
+      border-top-color: #c8784a;
+      animation: spin 0.8s linear infinite;
+    }
+    #loading .lbl { font-style: italic; font-size: 17px; opacity: 0.85; letter-spacing: 0.3px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div id="loading">
+    <div class="spinner"></div>
+    <div class="lbl">Salty Cowboys</div>
+  </div>
+  <div id="root"></div>
+
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+
+  <script>
+const {
+  useState,
+  useEffect
+} = React;
+
+// ─── DATA ────────────────────────────────────────────────────────────────────
+
+const HORSES = [{
+  id: 1,
+  name: "Kuda",
+  emoji: "🐴",
+  weightClass: "<50",
+  experience: "Beginner",
+  color: "#c8956c",
+  available: [1, 2, 4, 5, 8, 9, 11, 12, 15, 16, 18, 19, 22, 23]
+}, {
+  id: 2,
+  name: "Dewi",
+  emoji: "🌺",
+  weightClass: "<70",
+  experience: "Intermediate",
+  color: "#8b5e3c",
+  available: [2, 3, 5, 6, 9, 10, 12, 13, 16, 17, 19, 20, 23, 24]
+}, {
+  id: 3,
+  name: "Surya",
+  emoji: "☀️",
+  weightClass: ">70",
+  experience: "Beginner",
+  color: "#6b4c2a",
+  available: [1, 3, 4, 6, 7, 10, 11, 13, 14, 17, 18, 21, 22, 24]
+}, {
+  id: 4,
+  name: "Bulan",
+  emoji: "🌙",
+  weightClass: "<70",
+  experience: "Advanced",
+  color: "#4a3728",
+  available: [2, 4, 5, 7, 8, 11, 12, 14, 15, 18, 19, 21, 22]
+}, {
+  id: 5,
+  name: "Ratu",
+  emoji: "👑",
+  weightClass: ">70",
+  experience: "Intermediate",
+  color: "#9a6b4b",
+  available: [1, 3, 5, 6, 8, 9, 12, 13, 15, 16, 20, 21, 23, 24]
+}];
+const ACTIVITIES = [{
+  category: "Rides",
+  items: [{
+    id: "beach",
+    name: "Beach & Ricefield Ride",
+    icon: "🌊",
+    durations: ["1hr", "1.5hr", "2hr"],
+    slots: ["8:00am", "5:00pm"],
+    experienceNeeded: "Beginner"
+  }]
+}, {
+  category: "Photoshoots",
+  items: [{
+    id: "photo",
+    name: "Photoshoot",
+    icon: "📸",
+    durations: ["1hr", "1.5hr", "2hr"],
+    slots: ["8:00am", "5:00pm"],
+    experienceNeeded: "Beginner"
+  }]
+}, {
+  category: "Off Saddle Activities",
+  items: [{
+    id: "whisper",
+    name: "Horse Whisperer Course",
+    icon: "🤝",
+    durations: ["10hr"],
+    slots: ["8:00am", "5:00pm"],
+    experienceNeeded: "Beginner",
+    offSaddle: true
+  }, {
+    id: "joinup",
+    name: "Join Up Lesson",
+    icon: "🔄",
+    durations: ["50min"],
+    slots: ["8:00am", "5:00pm"],
+    experienceNeeded: "Beginner",
+    offSaddle: true
+  }, {
+    id: "lunge",
+    name: "Lunge Lesson",
+    icon: "🎯",
+    durations: ["50min"],
+    slots: ["8:00am", "5:00pm"],
+    experienceNeeded: "Intermediate",
+    offSaddle: true
+  }]
+}];
+const ALL_ACTIVITIES = ACTIVITIES.flatMap(c => c.items);
+const WEIGHT_OPTIONS = ["Under 50 kg", "50–70 kg", "Over 70 kg"];
+const EXPERIENCE_OPTIONS = ["Never ridden", "Beginner", "Intermediate", "Advanced"];
+const PEOPLE_OPTIONS = ["1", "2", "3", "4", "5+"];
+function weightClass(label) {
+  if (label === "Under 50 kg") return "<50";
+  if (label === "50–70 kg") return "<70";
+  return ">70";
+}
+function experienceClass(label) {
+  if (label === "Never ridden" || label === "Beginner") return "Beginner";
+  if (label === "Intermediate") return "Intermediate";
+  return "Advanced";
+}
+const EXP_RANK = {
+  Beginner: 0,
+  Intermediate: 1,
+  Advanced: 2
+};
+function matchHorses(riders) {
+  // For each rider, find compatible horses; return best set covering all riders
+  const riderMatches = riders.map(r => {
+    const wc = weightClass(r.weight);
+    const ec = experienceClass(r.experience);
+    return HORSES.filter(h => {
+      const weightOk = h.weightClass === wc || wc === "<70" && h.weightClass === ">70" || wc === "<50" && (h.weightClass === "<70" || h.weightClass === ">70");
+      const expOk = EXP_RANK[h.experience] >= EXP_RANK[ec] || h.experience === ec;
+      // simpler: horse can carry rider if horse.weightClass covers them
+      const wMap = {
+        "<50": 50,
+        "<70": 70,
+        ">70": 200
+      };
+      const rMap = {
+        "Under 50 kg": 49,
+        "50–70 kg": 65,
+        "Over 70 kg": 80
+      };
+      const horseMax = wMap[h.weightClass];
+      const riderWeight = rMap[r.weight];
+      return riderWeight <= horseMax && EXP_RANK[h.experience] <= EXP_RANK[ec];
+    });
+  });
+  return riderMatches;
+}
+function getSharedAvailableDates(selectedHorseIds) {
+  if (!selectedHorseIds.length) return [];
+  const sets = selectedHorseIds.map(id => new Set(HORSES.find(h => h.id === id)?.available || []));
+  const shared = [...sets[0]].filter(d => sets.every(s => s.has(d)));
+  return shared;
+}
+
+// ─── STYLES ──────────────────────────────────────────────────────────────────
+
+const css = `
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400;1,600&family=Outfit:wght@300;400;500;600&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { background: #0e0b08; }
+
+:root {
+  --sand: #f5ede0;
+  --earth: #2a1f14;
+  --bark: #4a3728;
+  --clay: #c8784a;
+  --dusk: #7a6652;
+  --cream: #faf6f0;
+  --fog:   #e8ddd0;
+  --leaf:  #4a7c4a;
+}
+
+.app {
+  font-family: 'Outfit', sans-serif;
+  max-width: 430px;
+  margin: 0 auto;
+  min-height: 100vh;
+  background: var(--cream);
+  position: relative;
+  overflow: hidden;
+}
+
+/* ── HERO HEADER ── */
+.hero {
+  background: var(--earth);
+  padding: 28px 24px 22px;
+  position: relative;
+  overflow: hidden;
+}
+.hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 80% 0%, #c8784a33 0%, transparent 60%);
+  pointer-events: none;
+}
+.hero-eyebrow {
+  font-size: 10px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--clay);
+  margin-bottom: 6px;
+  font-weight: 500;
+}
+.hero-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 28px;
+  color: var(--sand);
+  font-style: italic;
+  line-height: 1.15;
+  margin-bottom: 4px;
+}
+.hero-sub {
+  font-size: 12px;
+  color: rgba(245,237,224,0.45);
+  letter-spacing: 0.3px;
+}
+
+/* ── STEP INDICATOR ── */
+.steps {
+  display: flex;
+  align-items: center;
+  padding: 16px 24px;
+  gap: 0;
+  background: var(--earth);
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+.step-dot {
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 600;
+  border: 1.5px solid rgba(245,237,224,0.2);
+  color: rgba(245,237,224,0.3);
+  flex-shrink: 0;
+  transition: all 0.3s;
+}
+.step-dot.done   { background: var(--clay); border-color: var(--clay); color: #fff; }
+.step-dot.active { background: transparent; border-color: var(--clay); color: var(--clay); }
+.step-line {
+  flex: 1; height: 1px;
+  background: rgba(245,237,224,0.1);
+  transition: background 0.3s;
+}
+.step-line.done { background: var(--clay); }
+
+/* ── BODY ── */
+.body { padding: 24px; }
+
+.section-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 22px;
+  font-style: italic;
+  color: var(--earth);
+  margin-bottom: 4px;
+}
+.section-hint {
+  font-size: 12px;
+  color: var(--dusk);
+  margin-bottom: 20px;
+  line-height: 1.5;
+}
+
+/* ── ACTIVITY GRID ── */
+.act-category {
+  font-size: 10px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--dusk);
+  margin-bottom: 10px;
+  margin-top: 18px;
+  font-weight: 500;
+}
+.act-category:first-child { margin-top: 0; }
+
+.act-card {
+  background: #fff;
+  border: 1.5px solid var(--fog);
+  border-radius: 14px;
+  padding: 14px 16px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.act-card:hover   { border-color: var(--clay); box-shadow: 0 4px 14px rgba(200,120,74,0.1); }
+.act-card.selected{ border-color: var(--clay); background: #fff8f4; }
+.act-icon { font-size: 22px; width: 36px; text-align: center; flex-shrink: 0; }
+.act-name { font-size: 14px; font-weight: 500; color: var(--earth); }
+.act-meta { font-size: 11px; color: var(--dusk); margin-top: 2px; }
+.act-check {
+  margin-left: auto;
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  background: var(--clay);
+  color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px;
+  flex-shrink: 0;
+  opacity: 0;
+  transform: scale(0.6);
+  transition: all 0.2s;
+}
+.act-card.selected .act-check { opacity: 1; transform: scale(1); }
+
+/* ── OPTION PILLS ── */
+.pill-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+.pill {
+  padding: 9px 16px;
+  border: 1.5px solid var(--fog);
+  border-radius: 24px;
+  font-size: 13px;
+  cursor: pointer;
+  background: #fff;
+  color: var(--earth);
+  transition: all 0.18s;
+  font-family: 'Outfit', sans-serif;
+}
+.pill:hover    { border-color: var(--clay); }
+.pill.selected { background: var(--earth); border-color: var(--earth); color: var(--sand); }
+
+/* ── RIDER CARDS ── */
+.rider-card {
+  background: #fff;
+  border: 1.5px solid var(--fog);
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+.rider-label {
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--dusk);
+  margin-bottom: 14px;
+  font-weight: 500;
+}
+.rider-field { margin-bottom: 12px; }
+.field-label {
+  font-size: 11px;
+  color: var(--dusk);
+  margin-bottom: 6px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+}
+.field-pills { display: flex; flex-wrap: wrap; gap: 6px; }
+.field-pill {
+  padding: 7px 13px;
+  border: 1.5px solid var(--fog);
+  border-radius: 20px;
+  font-size: 12px;
+  cursor: pointer;
+  background: #fff;
+  color: var(--earth);
+  transition: all 0.15s;
+  font-family: 'Outfit', sans-serif;
+}
+.field-pill:hover    { border-color: var(--clay); }
+.field-pill.selected { background: var(--earth); border-color: var(--earth); color: var(--sand); }
+
+/* ── DATE / TIME ── */
+.dt-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+.dt-card {
+  background: #fff;
+  border: 1.5px solid var(--fog);
+  border-radius: 12px;
+  padding: 14px;
+  cursor: pointer;
+  transition: all 0.18s;
+  text-align: center;
+}
+.dt-card:hover    { border-color: var(--clay); }
+.dt-card.selected { background: var(--earth); border-color: var(--earth); }
+.dt-card.selected .dt-main { color: var(--sand); }
+.dt-card.selected .dt-sub  { color: rgba(245,237,224,0.55); }
+.dt-main { font-size: 15px; font-weight: 500; color: var(--earth); transition: color 0.18s; }
+.dt-sub  { font-size: 11px; color: var(--dusk); margin-top: 2px; transition: color 0.18s; }
+
+.input-field {
+  width: 100%;
+  padding: 13px 15px;
+  border: 1.5px solid var(--fog);
+  border-radius: 12px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 14px;
+  color: var(--earth);
+  background: #fff;
+  outline: none;
+  transition: border 0.18s;
+  margin-bottom: 20px;
+}
+.input-field:focus { border-color: var(--clay); }
+
+/* ── CTA ── */
+.cta {
+  width: 100%;
+  padding: 16px;
+  background: var(--clay);
+  color: #fff;
+  border: none;
+  border-radius: 14px;
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic;
+  font-size: 18px;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.1s;
+  margin-top: 8px;
+}
+.cta:hover   { background: #b5663a; }
+.cta:active  { transform: scale(0.99); }
+.cta:disabled{ background: #c8b5a0; cursor: not-allowed; }
+
+.back-link {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--dusk);
+  cursor: pointer;
+  margin-bottom: 20px;
+  width: fit-content;
+}
+.back-link:hover { color: var(--earth); }
+
+/* ── CALENDAR SCREEN ── */
+.cal-header {
+  background: var(--earth);
+  padding: 20px 24px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.cal-month {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 18px;
+  color: var(--sand);
+  font-style: italic;
+}
+.cal-nav {
+  background: none;
+  border: 1px solid rgba(245,237,224,0.2);
+  color: var(--sand);
+  width: 30px; height: 30px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s;
+}
+.cal-nav:hover { background: rgba(245,237,224,0.1); }
+
+.cal-grid {
+  padding: 16px 24px;
+  background: var(--earth);
+}
+.cal-days-header {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  margin-bottom: 8px;
+}
+.cal-day-name {
+  text-align: center;
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: rgba(245,237,224,0.3);
+  padding: 4px 0;
+}
+.cal-days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 3px;
+}
+.cal-day {
+  aspect-ratio: 1;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 400;
+  cursor: default;
+  color: rgba(245,237,224,0.2);
+  position: relative;
+}
+.cal-day.available {
+  color: var(--sand);
+  cursor: pointer;
+  background: rgba(200,120,74,0.15);
+  border: 1px solid rgba(200,120,74,0.3);
+}
+.cal-day.available:hover { background: rgba(200,120,74,0.3); }
+.cal-day.selected {
+  background: var(--clay) !important;
+  color: #fff !important;
+  border-color: var(--clay) !important;
+}
+.cal-day.today-marker { font-weight: 600; }
+
+.cal-legend {
+  padding: 12px 24px;
+  background: var(--earth);
+  display: flex;
+  gap: 16px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+.legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: rgba(245,237,224,0.4); }
+.legend-dot {
+  width: 10px; height: 10px;
+  border-radius: 3px;
+}
+
+.cal-selection-panel {
+  padding: 20px 24px;
+}
+.sel-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 18px;
+  font-style: italic;
+  color: var(--earth);
+  margin-bottom: 14px;
+}
+.time-cards { display: flex; gap: 10px; margin-bottom: 20px; }
+.time-card {
+  flex: 1;
+  padding: 14px;
+  background: #fff;
+  border: 1.5px solid var(--fog);
+  border-radius: 12px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.18s;
+}
+.time-card:hover    { border-color: var(--clay); }
+.time-card.selected { background: var(--earth); border-color: var(--earth); }
+.time-card.selected .time-main { color: var(--sand); }
+.time-card.selected .time-sub  { color: rgba(245,237,224,0.5); }
+.time-main { font-size: 16px; font-weight: 500; color: var(--earth); }
+.time-sub  { font-size: 11px; color: var(--dusk); margin-top: 2px; }
+
+.match-preview {
+  background: #fff;
+  border: 1.5px solid var(--fog);
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+.match-preview-title {
+  font-size: 10px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--dusk);
+  margin-bottom: 12px;
+  font-weight: 500;
+}
+.match-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--fog);
+}
+.match-row:last-child { border-bottom: none; padding-bottom: 0; }
+.match-horse-avatar {
+  width: 36px; height: 36px;
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+.match-info { flex: 1; }
+.match-horse-name { font-size: 14px; font-weight: 500; color: var(--earth); }
+.match-rider-name { font-size: 11px; color: var(--dusk); }
+.match-tag {
+  font-size: 10px;
+  padding: 3px 8px;
+  border-radius: 20px;
+  background: #f0ece5;
+  color: var(--dusk);
+}
+
+.notice {
+  background: #fff8f4;
+  border: 1px solid #f0d5c0;
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 12px;
+  color: #9a5a30;
+  line-height: 1.5;
+  margin-bottom: 16px;
+  display: flex;
+  gap: 8px;
+}
+
+/* ── CONFIRM SCREEN ── */
+.confirm-screen {
+  padding: 36px 24px;
+  text-align: center;
+}
+.confirm-icon { font-size: 54px; margin-bottom: 16px; }
+.confirm-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 26px;
+  font-style: italic;
+  color: var(--earth);
+  margin-bottom: 8px;
+}
+.confirm-sub {
+  font-size: 13px;
+  color: var(--dusk);
+  line-height: 1.65;
+  margin-bottom: 28px;
+}
+.confirm-summary {
+  background: #fff;
+  border: 1.5px solid var(--fog);
+  border-radius: 14px;
+  padding: 18px;
+  text-align: left;
+  margin-bottom: 24px;
+}
+.sum-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 7px 0;
+  font-size: 13px;
+  border-bottom: 1px solid var(--fog);
+}
+.sum-row:last-child { border-bottom: none; }
+.sum-key { color: var(--dusk); }
+.sum-val { color: var(--earth); font-weight: 500; text-align: right; max-width: 60%; }
+
+.cta-ghost {
+  width: 100%;
+  padding: 14px;
+  background: transparent;
+  border: 1.5px solid var(--fog);
+  border-radius: 14px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 14px;
+  color: var(--dusk);
+  cursor: pointer;
+  margin-top: 10px;
+  transition: all 0.2s;
+}
+.cta-ghost:hover { border-color: var(--earth); color: var(--earth); }
+
+/* ── WEIGHT WARNING BANNER ── */
+.weight-warning {
+  background: #fffaf5;
+  border: 1.5px solid #f0d5b0;
+  border-radius: 14px;
+  padding: 16px;
+  margin-top: 10px;
+  animation: fadeUp 0.25s ease both;
+}
+.ww-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.ww-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.ww-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 15px;
+  font-weight: 600;
+  color: #7a4a1a;
+  margin-bottom: 4px;
+}
+.ww-body {
+  font-size: 12.5px;
+  color: #9a6030;
+  line-height: 1.6;
+}
+.ww-acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 12px;
+}
+.ww-act-tag {
+  padding: 5px 11px;
+  background: #fff0de;
+  border: 1px solid #f0d5b0;
+  border-radius: 20px;
+  font-size: 11.5px;
+  color: #7a4a1a;
+  font-weight: 500;
+}
+.ww-btn {
+  width: 100%;
+  padding: 12px;
+  background: #c8784a;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  transition: background 0.2s;
+}
+.ww-btn:hover { background: #b5663a; }
+
+/* ── NO AVAILABILITY MODAL ── */
+.no-avail-modal {
+  margin: 0 24px 20px;
+  background: var(--earth);
+  border-radius: 16px;
+  padding: 20px;
+  animation: fadeUp 0.3s ease both;
+}
+.no-avail-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.no-avail-icon { font-size: 24px; flex-shrink: 0; }
+.no-avail-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 17px;
+  font-style: italic;
+  color: var(--sand);
+  margin-bottom: 4px;
+}
+.no-avail-body {
+  font-size: 12px;
+  color: rgba(245,237,224,0.55);
+  line-height: 1.6;
+}
+.wa-btn {
+  width: 100%;
+  padding: 13px;
+  background: #25D366;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: background 0.2s;
+  letter-spacing: 0.2px;
+}
+.wa-btn:hover { background: #1ebe5a; }
+.wa-icon { font-size: 18px; }
+
+/* ── ANIMATIONS ── */
+@keyframes fadeUp {
+  from { opacity:0; transform:translateY(14px); }
+  to   { opacity:1; transform:translateY(0); }
+}
+.fu  { animation: fadeUp 0.3s ease both; }
+.fu2 { animation: fadeUp 0.3s 0.07s ease both; }
+.fu3 { animation: fadeUp 0.3s 0.14s ease both; }
+.fu4 { animation: fadeUp 0.3s 0.21s ease both; }
+`;
+
+// ─── HELPERS ────────────────────────────────────────────────────────────────
+
+function getDaysInMonth(year, month) {
+  return new Date(year, month + 1, 0).getDate();
+}
+function getFirstDay(year, month) {
+  return new Date(year, month, 1).getDay();
+}
+const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+const DAY_NAMES = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+
+// ─── MAIN COMPONENT ──────────────────────────────────────────────────────────
+
+function App() {
+  const [screen, setScreen] = useState("activity"); // activity | riders | calendar | confirm
+  const [activity, setActivity] = useState(null);
+  const [duration, setDuration] = useState(null);
+  const [numPeople, setNumPeople] = useState(null);
+  const [riders, setRiders] = useState([]);
+  const [calMonth, setCalMonth] = useState(4); // May (0-indexed)
+  const [calYear, setCalYear] = useState(2026);
+  const [selectedDate, setSelectedDate] = useState(null);
+  const [selectedTime, setSelectedTime] = useState(null);
+  const [horseMatches, setHorseMatches] = useState([]);
+  const [availableDates, setAvailableDates] = useState([]);
+
+  // Derived
+  const actObj = ALL_ACTIVITIES.find(a => a.id === activity);
+  const isOffSaddle = actObj?.offSaddle === true;
+
+  // When riders change, compute matches & available dates
+  useEffect(() => {
+    if (riders.length && riders.every(r => r.weight && r.experience)) {
+      const riderMatches = matchHorses(riders);
+      // pick best horse per rider (no two riders share a horse)
+      const assigned = [];
+      const usedIds = new Set();
+      let possible = true;
+      for (let i = 0; i < riderMatches.length; i++) {
+        const avail = riderMatches[i].filter(h => !usedIds.has(h.id));
+        if (!avail.length) {
+          possible = false;
+          break;
+        }
+        assigned.push({
+          rider: riders[i],
+          horse: avail[0]
+        });
+        usedIds.add(avail[0].id);
+      }
+      if (possible) {
+        setHorseMatches(assigned);
+        const ids = assigned.map(a => a.horse.id);
+        setAvailableDates(getSharedAvailableDates(ids));
+      } else {
+        setHorseMatches([]);
+        setAvailableDates([]);
+      }
+    }
+  }, [riders]);
+
+  // Init rider array when numPeople chosen
+  function initRiders(n) {
+    const count = n === "5+" ? 5 : parseInt(n);
+    setRiders(Array.from({
+      length: count
+    }, (_, i) => ({
+      id: i,
+      label: count === 1 ? "Rider" : `Rider ${i + 1}`,
+      weight: "",
+      experience: ""
+    })));
+    setNumPeople(n);
+  }
+  function updateRider(idx, field, val) {
+    setRiders(prev => prev.map((r, i) => i === idx ? {
+      ...r,
+      [field]: val
+    } : r));
+  }
+  const step = screen === "activity" ? 1 : screen === "riders" ? 2 : screen === "calendar" ? 3 : 4;
+  const ridersComplete = riders.length > 0 && riders.every(r => (isOffSaddle || r.weight) && r.experience);
+
+  // ── Calendar helpers
+  const daysInMonth = getDaysInMonth(calYear, calMonth);
+  const firstDay = getFirstDay(calYear, calMonth);
+  const availableSet = new Set(availableDates);
+  function handleDayClick(day) {
+    if (!availableSet.has(day)) return;
+    setSelectedDate(day);
+    setSelectedTime(null);
+  }
+
+  // ── Formatted summary
+  const formattedDate = selectedDate ? `${MONTHS[calMonth]} ${selectedDate}, ${calYear}` : null;
+  return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("style", null, css), /*#__PURE__*/React.createElement("div", {
+    className: "app"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "hero"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "hero-eyebrow"
+  }, "Salty Cowboys \xB7 Bali"), /*#__PURE__*/React.createElement("div", {
+    className: "hero-title"
+  }, "Book your", /*#__PURE__*/React.createElement("br", null), "experience"), /*#__PURE__*/React.createElement("div", {
+    className: "hero-sub"
+  }, "Horse rescue sanctuary & riding centre")), screen !== "confirm" && /*#__PURE__*/React.createElement("div", {
+    className: "steps"
+  }, [1, 2, 3].map((s, i) => /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    key: s,
+    className: `step-dot ${step > s ? "done" : step === s ? "active" : ""}`
+  }, step > s ? "✓" : s), i < 2 && /*#__PURE__*/React.createElement("div", {
+    className: `step-line ${step > s + 0 ? "done" : ""}`
+  })))), screen === "activity" && /*#__PURE__*/React.createElement("div", {
+    className: "body fu"
+  }, /*#__PURE__*/React.createElement("h2", {
+    className: "section-title"
+  }, "Choose an activity"), /*#__PURE__*/React.createElement("p", {
+    className: "section-hint"
+  }, "What would you like to do?"), ACTIVITIES.map(cat => /*#__PURE__*/React.createElement("div", {
+    key: cat.category
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "act-category"
+  }, cat.category), cat.items.map(item => /*#__PURE__*/React.createElement("div", {
+    key: item.id,
+    className: `act-card ${activity === item.id ? "selected" : ""}`,
+    onClick: () => {
+      setActivity(item.id);
+      setDuration(null);
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "act-icon"
+  }, item.icon), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "act-name"
+  }, item.name), /*#__PURE__*/React.createElement("div", {
+    className: "act-meta"
+  }, item.slots.join(" · "), " \xB7 ", item.durations.join(", "))), /*#__PURE__*/React.createElement("div", {
+    className: "act-check"
+  }, "\u2713"))))), activity && /*#__PURE__*/React.createElement("div", {
+    className: "fu2"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "act-category",
+    style: {
+      marginTop: 20
+    }
+  }, "Duration"), /*#__PURE__*/React.createElement("div", {
+    className: "pill-row"
+  }, actObj.durations.map(d => /*#__PURE__*/React.createElement("button", {
+    key: d,
+    className: `pill ${duration === d ? "selected" : ""}`,
+    onClick: () => setDuration(d)
+  }, d)))), activity && duration && /*#__PURE__*/React.createElement("div", {
+    className: "fu3"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "act-category"
+  }, "Number of people"), /*#__PURE__*/React.createElement("div", {
+    className: "pill-row"
+  }, PEOPLE_OPTIONS.map(n => /*#__PURE__*/React.createElement("button", {
+    key: n,
+    className: `pill ${numPeople === n ? "selected" : ""}`,
+    onClick: () => initRiders(n)
+  }, n)))), activity && duration && numPeople && /*#__PURE__*/React.createElement("button", {
+    className: "cta fu4",
+    onClick: () => setScreen("riders")
+  }, "Continue \u2192")), screen === "riders" && /*#__PURE__*/React.createElement("div", {
+    className: "body fu"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "back-link",
+    onClick: () => setScreen("activity")
+  }, "\u2190 Back"), /*#__PURE__*/React.createElement("h2", {
+    className: "section-title"
+  }, riders.length === 1 ? "About you" : `About the riders`), /*#__PURE__*/React.createElement("p", {
+    className: "section-hint"
+  }, "We'll match each rider to their ideal horse.", riders.length > 1 ? ` ${riders.length} riders · ${actObj?.name}` : ` ${actObj?.name}`), riders.map((rider, idx) => /*#__PURE__*/React.createElement("div", {
+    key: rider.id,
+    className: `rider-card fu`,
+    style: {
+      animationDelay: `${idx * 0.06}s`
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "rider-label"
+  }, riders.length === 1 ? "Your details" : rider.label), !isOffSaddle && /*#__PURE__*/React.createElement("div", {
+    className: "rider-field"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "field-label"
+  }, "Weight range"), /*#__PURE__*/React.createElement("div", {
+    className: "field-pills"
+  }, WEIGHT_OPTIONS.map(w => /*#__PURE__*/React.createElement("button", {
+    key: w,
+    className: `field-pill ${rider.weight === w ? "selected" : ""}`,
+    onClick: () => updateRider(idx, "weight", w)
+  }, w))), rider.weight === "Over 70 kg" && /*#__PURE__*/React.createElement("div", {
+    className: "weight-warning"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "ww-header"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "ww-icon"
+  }, "\uD83D\uDC34"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "ww-title"
+  }, "A note about our horses"), /*#__PURE__*/React.createElement("div", {
+    className: "ww-body"
+  }, "To prevent strain on our horses' backs, we only accept riders under 70 kg for saddle activities. If this is you, you're still very welcome \u2014 we have a wonderful range of off-saddle experiences:"))), /*#__PURE__*/React.createElement("div", {
+    className: "ww-acts"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "ww-act-tag"
+  }, "\uD83E\uDD1D Horse Whisperer Course"), /*#__PURE__*/React.createElement("span", {
+    className: "ww-act-tag"
+  }, "\uD83C\uDFAF Lunge Lesson"), /*#__PURE__*/React.createElement("span", {
+    className: "ww-act-tag"
+  }, "\uD83E\uDEAE Grooming")), /*#__PURE__*/React.createElement("button", {
+    className: "ww-btn",
+    onClick: () => {
+      setScreen("activity");
+      setActivity(null);
+      setDuration(null);
+      setNumPeople(null);
+      setRiders([]);
+    }
+  }, "Explore off-saddle activities \u2192"))), /*#__PURE__*/React.createElement("div", {
+    className: "rider-field"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "field-label"
+  }, "Riding experience"), /*#__PURE__*/React.createElement("div", {
+    className: "field-pills"
+  }, EXPERIENCE_OPTIONS.map(e => /*#__PURE__*/React.createElement("button", {
+    key: e,
+    className: `field-pill ${rider.experience === e ? "selected" : ""}`,
+    onClick: () => updateRider(idx, "experience", e)
+  }, e)))))), /*#__PURE__*/React.createElement("button", {
+    className: "cta",
+    disabled: !ridersComplete,
+    onClick: () => setScreen("calendar")
+  }, "See availability \u2192")), screen === "calendar" && /*#__PURE__*/React.createElement("div", {
+    className: "fu"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "back-link",
+    style: {
+      padding: "16px 24px 0"
+    },
+    onClick: () => setScreen("riders")
+  }, "\u2190 Back"), /*#__PURE__*/React.createElement("div", {
+    className: "cal-header"
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "cal-nav",
+    onClick: () => {
+      if (calMonth === 0) {
+        setCalMonth(11);
+        setCalYear(y => y - 1);
+      } else setCalMonth(m => m - 1);
+    }
+  }, "\u2039"), /*#__PURE__*/React.createElement("div", {
+    className: "cal-month"
+  }, MONTHS[calMonth], " ", calYear), /*#__PURE__*/React.createElement("button", {
+    className: "cal-nav",
+    onClick: () => {
+      if (calMonth === 11) {
+        setCalMonth(0);
+        setCalYear(y => y + 1);
+      } else setCalMonth(m => m + 1);
+    }
+  }, "\u203A")), /*#__PURE__*/React.createElement("div", {
+    className: "cal-grid"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "cal-days-header"
+  }, DAY_NAMES.map(d => /*#__PURE__*/React.createElement("div", {
+    key: d,
+    className: "cal-day-name"
+  }, d))), /*#__PURE__*/React.createElement("div", {
+    className: "cal-days"
+  }, Array.from({
+    length: firstDay
+  }).map((_, i) => /*#__PURE__*/React.createElement("div", {
+    key: "e" + i,
+    className: "cal-day"
+  })), Array.from({
+    length: daysInMonth
+  }).map((_, i) => {
+    const day = i + 1;
+    const isAvail = availableSet.has(day);
+    const isSel = selectedDate === day;
+    return /*#__PURE__*/React.createElement("div", {
+      key: day,
+      className: `cal-day ${isAvail ? "available" : ""} ${isSel ? "selected" : ""}`,
+      onClick: () => handleDayClick(day)
+    }, day);
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "cal-legend"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "legend-item"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "legend-dot",
+    style: {
+      background: "rgba(200,120,74,0.4)",
+      border: "1px solid rgba(200,120,74,0.5)"
+    }
+  }), "Available"), /*#__PURE__*/React.createElement("div", {
+    className: "legend-item"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "legend-dot",
+    style: {
+      background: "var(--clay)"
+    }
+  }), "Selected"), /*#__PURE__*/React.createElement("div", {
+    className: "legend-item"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "legend-dot",
+    style: {
+      background: "rgba(245,237,224,0.08)"
+    }
+  }), "Unavailable")), availableDates.length === 0 && /*#__PURE__*/React.createElement("div", {
+    className: "no-avail-modal"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "no-avail-top"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "no-avail-icon"
+  }, "\uD83D\uDDD3\uFE0F"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "no-avail-title"
+  }, "No dates available right now"), /*#__PURE__*/React.createElement("div", {
+    className: "no-avail-body"
+  }, "The date or time you're looking for isn't showing availability for your group. Reach out to us directly on WhatsApp and we'll do our best to make it work."))), /*#__PURE__*/React.createElement("button", {
+    className: "wa-btn",
+    onClick: () => window.open("https://wa.me/6281234567890?text=Hi%20Salty%20Cowboys!%20I'd%20like%20to%20book%20a%20ride%20but%20couldn't%20find%20availability%20online.", "_blank")
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "wa-icon"
+  }, "\uD83D\uDCAC"), "Message us on WhatsApp")), /*#__PURE__*/React.createElement("div", {
+    className: "cal-selection-panel"
+  }, availableDates.length > 0 && !selectedDate && /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: 13,
+      color: "var(--dusk)",
+      lineHeight: 1.6
+    }
+  }, "Select an available date above to choose your time slot."), selectedDate && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    className: "sel-title"
+  }, MONTHS[calMonth], " ", selectedDate), /*#__PURE__*/React.createElement("div", {
+    className: "act-category",
+    style: {
+      marginTop: 0,
+      marginBottom: 10
+    }
+  }, "Time slot"), /*#__PURE__*/React.createElement("div", {
+    className: "time-cards"
+  }, actObj.slots.map(slot => /*#__PURE__*/React.createElement("div", {
+    key: slot,
+    className: `time-card ${selectedTime === slot ? "selected" : ""}`,
+    onClick: () => setSelectedTime(slot)
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "time-main"
+  }, slot), /*#__PURE__*/React.createElement("div", {
+    className: "time-sub"
+  }, actObj.name.includes("Course") ? "Full day" : duration)))), horseMatches.length > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "match-preview fu2"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "match-preview-title"
+  }, "Your matched horses"), horseMatches.map((m, i) => /*#__PURE__*/React.createElement("div", {
+    key: i,
+    className: "match-row"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "match-horse-avatar",
+    style: {
+      background: m.horse.color + "22"
+    }
+  }, m.horse.emoji), /*#__PURE__*/React.createElement("div", {
+    className: "match-info"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "match-horse-name"
+  }, m.horse.name), /*#__PURE__*/React.createElement("div", {
+    className: "match-rider-name"
+  }, m.rider.label, " \xB7 ", m.rider.experience)), /*#__PURE__*/React.createElement("div", {
+    className: "match-tag"
+  }, m.rider.weight)))), /*#__PURE__*/React.createElement("div", {
+    className: "notice"
+  }, /*#__PURE__*/React.createElement("span", null, "\uD83C\uDF3F"), /*#__PURE__*/React.createElement("span", null, "These matches are subject to confirmation by Salty Cowboys. Simone will review and approve before your booking is finalised.")), /*#__PURE__*/React.createElement("button", {
+    className: "cta",
+    disabled: !selectedTime,
+    onClick: () => setScreen("confirm")
+  }, "Request this booking \u2192")))), screen === "confirm" && /*#__PURE__*/React.createElement("div", {
+    className: "confirm-screen fu"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "confirm-icon"
+  }, "\uD83C\uDF3A"), /*#__PURE__*/React.createElement("h2", {
+    className: "confirm-title"
+  }, "Request sent", /*#__PURE__*/React.createElement("br", null), "to Simone"), /*#__PURE__*/React.createElement("p", {
+    className: "confirm-sub"
+  }, "Your booking request is pending approval. Simone will review your horse matches and confirm within a few hours \u2014 usually sooner."), /*#__PURE__*/React.createElement("div", {
+    className: "confirm-summary"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "sum-row"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "sum-key"
+  }, "Activity"), /*#__PURE__*/React.createElement("span", {
+    className: "sum-val"
+  }, actObj?.name)), /*#__PURE__*/React.createElement("div", {
+    className: "sum-row"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "sum-key"
+  }, "Duration"), /*#__PURE__*/React.createElement("span", {
+    className: "sum-val"
+  }, duration)), /*#__PURE__*/React.createElement("div", {
+    className: "sum-row"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "sum-key"
+  }, "Date & time"), /*#__PURE__*/React.createElement("span", {
+    className: "sum-val"
+  }, formattedDate, " \xB7 ", selectedTime)), /*#__PURE__*/React.createElement("div", {
+    className: "sum-row"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "sum-key"
+  }, "Riders"), /*#__PURE__*/React.createElement("span", {
+    className: "sum-val"
+  }, numPeople, " ", numPeople === "1" ? "person" : "people")), horseMatches.map((m, i) => /*#__PURE__*/React.createElement("div", {
+    key: i,
+    className: "sum-row"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "sum-key"
+  }, m.rider.label), /*#__PURE__*/React.createElement("span", {
+    className: "sum-val"
+  }, m.horse.emoji, " ", m.horse.name, " (pending)"))), /*#__PURE__*/React.createElement("div", {
+    className: "sum-row"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "sum-key"
+  }, "Status"), /*#__PURE__*/React.createElement("span", {
+    className: "sum-val",
+    style: {
+      color: "#c8784a"
+    }
+  }, "\u23F3 Awaiting approval"))), /*#__PURE__*/React.createElement("button", {
+    className: "cta",
+    onClick: () => {
+      setScreen("activity");
+      setActivity(null);
+      setDuration(null);
+      setNumPeople(null);
+      setRiders([]);
+      setSelectedDate(null);
+      setSelectedTime(null);
+      setHorseMatches([]);
+    }
+  }, "Make another booking"), /*#__PURE__*/React.createElement("button", {
+    className: "cta-ghost"
+  }, "Add to calendar"))));
+}
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(React.createElement(App));
+const loadingEl = document.getElementById('loading');
+if (loadingEl) {
+  requestAnimationFrame(() => {
+    loadingEl.style.transition = 'opacity 0.3s';
+    loadingEl.style.opacity = '0';
+    setTimeout(() => loadingEl.remove(), 320);
+  });
+}
+  </script>
+</body>
+</html>
