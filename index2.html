@@ -1,0 +1,1393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#2a1f14" />
+  <title>Salty Cowboys · Book your experience</title>
+  <meta name="description" content="Book a horse riding experience at Salty Cowboys — Bali horse rescue sanctuary & riding centre." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <style>
+    html, body { margin: 0; padding: 0; background: #0e0b08; -webkit-text-size-adjust: 100%; }
+    #loading {
+      position: fixed; inset: 0;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: #2a1f14; color: #f5ede0;
+      font-family: Georgia, 'Times New Roman', serif; gap: 14px;
+    }
+    #loading .spinner {
+      width: 34px; height: 34px; border-radius: 50%;
+      border: 2.5px solid rgba(245,237,224,0.18);
+      border-top-color: #c8784a;
+      animation: spin 0.8s linear infinite;
+    }
+    #loading .lbl { font-style: italic; font-size: 17px; opacity: 0.85; letter-spacing: 0.3px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div id="loading">
+    <div class="spinner"></div>
+    <div class="lbl">Salty Cowboys</div>
+  </div>
+  <div id="root"></div>
+
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <script type="text/babel" data-presets="react">
+const { useState, useEffect } = React;
+
+// ─── WHATSAPP DESTINATION ────────────────────────────────────────────────────
+// Booking requests are delivered to this number. Replace with Simone's real
+// number when ready (digits only, country code first, no "+" or spaces).
+const WA_NUMBER = "61466567953"; // +61 466 567 953
+
+// ─── DATA ────────────────────────────────────────────────────────────────────
+
+const HORSES = [
+  { id: 1, name: "Kuda",  emoji: "🐴", weightClass: "<50", experience: "Beginner",     color: "#c8956c", available: [1,2,4,5,8,9,11,12,15,16,18,19,22,23] },
+  { id: 2, name: "Dewi",  emoji: "🌺", weightClass: "<70", experience: "Intermediate", color: "#8b5e3c", available: [2,3,5,6,9,10,12,13,16,17,19,20,23,24] },
+  { id: 3, name: "Surya", emoji: "☀️", weightClass: ">70", experience: "Beginner",     color: "#6b4c2a", available: [1,3,4,6,7,10,11,13,14,17,18,21,22,24] },
+  { id: 4, name: "Bulan", emoji: "🌙", weightClass: "<70", experience: "Advanced",     color: "#4a3728", available: [2,4,5,7,8,11,12,14,15,18,19,21,22] },
+  { id: 5, name: "Ratu",  emoji: "👑", weightClass: ">70", experience: "Intermediate", color: "#9a6b4b", available: [1,3,5,6,8,9,12,13,15,16,20,21,23,24] },
+];
+
+const ACTIVITIES = [
+  { category: "Rides", items: [
+    { id: "beach", icon: "🌊", durations: ["1hr","1.5hr","2hr"], slots: ["8:00am","5:00pm"], experienceNeeded: "Beginner" },
+  ]},
+  { category: "Photoshoots", items: [
+    { id: "photo", icon: "📸", durations: ["1hr","1.5hr","2hr"], slots: ["8:00am","5:00pm"], experienceNeeded: "Beginner" },
+  ]},
+  { category: "Off Saddle Activities", items: [
+    { id: "whisper", icon: "🤝", durations: ["10hr"],  slots: ["8:00am","5:00pm"], experienceNeeded: "Beginner",     offSaddle: true },
+    { id: "joinup",  icon: "🔄", durations: ["50min"], slots: ["8:00am","5:00pm"], experienceNeeded: "Beginner",     offSaddle: true },
+    { id: "lunge",   icon: "🎯", durations: ["50min"], slots: ["8:00am","5:00pm"], experienceNeeded: "Intermediate", offSaddle: true },
+  ]},
+];
+const ALL_ACTIVITIES = ACTIVITIES.flatMap(c => c.items);
+const PEOPLE_OPTIONS = ["1","2","3","4","5+"];
+
+// ─── TRANSLATIONS ─────────────────────────────────────────────────────────────
+// The interface translates into English, Indonesian and Russian. The booking
+// message that lands in Simone's WhatsApp is always written in English so she
+// can read every request consistently.
+
+const LANGS = [
+  { code: "en", label: "EN" },
+  { code: "id", label: "ID" },
+  { code: "ru", label: "RU" },
+];
+
+const T = {
+  en: {
+    heroTitle1: "Book your", heroTitle2: "experience",
+    heroSub: "Horse rescue sanctuary & riding centre",
+    chooseActivity: "Choose an activity",
+    chooseActivityHint: "What would you like to do?",
+    duration: "Duration",
+    numPeople: "Number of people",
+    continue: "Continue →",
+    aboutYou: "About you", aboutRiders: "About the riders",
+    matchHint: "We'll match each rider to their ideal horse.",
+    yourDetails: "Your details", rider: "Rider",
+    name: "Name", namePlaceholder: "Full name",
+    age: "Age", agePlaceholder: "Years",
+    permission: "I confirm a parent or guardian has given permission for this rider (under 18) to take part.",
+    weight: "Weight range",
+    w1: "Under 50 kg", w2: "50–70 kg", w3: "Over 70 kg",
+    wwTitle: "A note about our horses",
+    wwBody: "To protect our horses' backs, saddle rides are for riders under 70 kg. You're still very welcome — we have a wonderful range of off-saddle experiences:",
+    wwTag1: "🤝 Horse Whisperer Course", wwTag2: "🎯 Lunge Lesson", wwTag3: "🪮 Grooming",
+    wwBtn: "Explore off-saddle activities →",
+    experience: "Riding experience",
+    e1: "Never ridden", e2: "Beginner", e3: "Intermediate", e4: "Advanced",
+    seeAvailability: "See availability →",
+    back: "← Back",
+    available: "Available", selected: "Selected", unavailable: "Unavailable",
+    pickDate: "Select an available date above to choose your time slot.",
+    timeSlot: "Time slot", fullDay: "Full day",
+    matchedHorses: "Your matched horses",
+    notesLabel: "Anything we should know? (optional)",
+    notesPlaceholder: "Allergies, special requests, questions…",
+    notice: "These matches are suggestions. Simone reviews and approves every request before your booking is confirmed.",
+    sendBtn: "Send request via WhatsApp →",
+    noAvailTitle: "No dates available right now",
+    noAvailBody: "The date or time you're after isn't showing availability for your group. Message us directly on WhatsApp and we'll do our best to make it work.",
+    waBtn: "Message us on WhatsApp",
+    sentTitle1: "Request sent", sentTitle2: "to Simone",
+    sentSub: "Your request has opened in WhatsApp — just hit send. Simone reviews your horse matches and confirms, usually within a few hours.",
+    sActivity: "Activity", sDuration: "Duration", sDateTime: "Date & time", sRiders: "Riders", sStatus: "Status",
+    awaiting: "⏳ Awaiting approval",
+    person: "person", people: "people",
+    pending: "(pending)",
+    another: "Make another booking",
+    activities: {
+      beach: "Beach & Ricefield Ride", photo: "Photoshoot",
+      whisper: "Horse Whisperer Course", joinup: "Join Up Lesson", lunge: "Lunge Lesson",
+    },
+    categories: { "Rides": "Rides", "Photoshoots": "Photoshoots", "Off Saddle Activities": "Off Saddle Activities" },
+  },
+  id: {
+    heroTitle1: "Pesan", heroTitle2: "pengalaman Anda",
+    heroSub: "Tempat penyelamatan kuda & pusat berkuda",
+    chooseActivity: "Pilih aktivitas",
+    chooseActivityHint: "Apa yang ingin Anda lakukan?",
+    duration: "Durasi",
+    numPeople: "Jumlah orang",
+    continue: "Lanjutkan →",
+    aboutYou: "Tentang Anda", aboutRiders: "Tentang penunggang",
+    matchHint: "Kami akan mencocokkan setiap penunggang dengan kuda yang ideal.",
+    yourDetails: "Detail Anda", rider: "Penunggang",
+    name: "Nama", namePlaceholder: "Nama lengkap",
+    age: "Usia", agePlaceholder: "Tahun",
+    permission: "Saya menyatakan orang tua atau wali telah memberi izin bagi penunggang ini (di bawah 18 tahun) untuk ikut serta.",
+    weight: "Rentang berat",
+    w1: "Di bawah 50 kg", w2: "50–70 kg", w3: "Di atas 70 kg",
+    wwTitle: "Catatan tentang kuda kami",
+    wwBody: "Untuk melindungi punggung kuda kami, berkuda dengan sadel hanya untuk penunggang di bawah 70 kg. Anda tetap sangat kami sambut — kami punya banyak pilihan aktivitas tanpa berkuda:",
+    wwTag1: "🤝 Kursus Horse Whisperer", wwTag2: "🎯 Pelajaran Lunge", wwTag3: "🪮 Merawat kuda",
+    wwBtn: "Jelajahi aktivitas tanpa berkuda →",
+    experience: "Pengalaman berkuda",
+    e1: "Belum pernah", e2: "Pemula", e3: "Menengah", e4: "Mahir",
+    seeAvailability: "Lihat ketersediaan →",
+    back: "← Kembali",
+    available: "Tersedia", selected: "Dipilih", unavailable: "Tidak tersedia",
+    pickDate: "Pilih tanggal yang tersedia di atas untuk memilih waktu.",
+    timeSlot: "Waktu", fullDay: "Sepanjang hari",
+    matchedHorses: "Kuda yang cocok untuk Anda",
+    notesLabel: "Ada yang perlu kami ketahui? (opsional)",
+    notesPlaceholder: "Alergi, permintaan khusus, pertanyaan…",
+    notice: "Pencocokan ini hanya saran. Simone meninjau dan menyetujui setiap permintaan sebelum pemesanan Anda dikonfirmasi.",
+    sendBtn: "Kirim permintaan via WhatsApp →",
+    noAvailTitle: "Belum ada tanggal tersedia",
+    noAvailBody: "Tanggal atau waktu yang Anda cari belum tersedia untuk grup Anda. Hubungi kami langsung di WhatsApp dan kami akan berusaha sebaik mungkin.",
+    waBtn: "Hubungi kami di WhatsApp",
+    sentTitle1: "Permintaan terkirim", sentTitle2: "ke Simone",
+    sentSub: "Permintaan Anda telah terbuka di WhatsApp — cukup tekan kirim. Simone akan meninjau pencocokan kuda Anda dan mengonfirmasi, biasanya dalam beberapa jam.",
+    sActivity: "Aktivitas", sDuration: "Durasi", sDateTime: "Tanggal & waktu", sRiders: "Penunggang", sStatus: "Status",
+    awaiting: "⏳ Menunggu persetujuan",
+    person: "orang", people: "orang",
+    pending: "(menunggu)",
+    another: "Buat pemesanan lain",
+    activities: {
+      beach: "Pantai & Sawah", photo: "Sesi foto",
+      whisper: "Kursus Horse Whisperer", joinup: "Pelajaran Join Up", lunge: "Pelajaran Lunge",
+    },
+    categories: { "Rides": "Berkuda", "Photoshoots": "Sesi foto", "Off Saddle Activities": "Tanpa berkuda" },
+  },
+  ru: {
+    heroTitle1: "Забронируйте", heroTitle2: "впечатление",
+    heroSub: "Приют для лошадей и центр верховой езды",
+    chooseActivity: "Выберите занятие",
+    chooseActivityHint: "Что бы вы хотели сделать?",
+    duration: "Длительность",
+    numPeople: "Количество человек",
+    continue: "Продолжить →",
+    aboutYou: "О вас", aboutRiders: "О наездниках",
+    matchHint: "Мы подберём каждому наезднику подходящую лошадь.",
+    yourDetails: "Ваши данные", rider: "Наездник",
+    name: "Имя", namePlaceholder: "Полное имя",
+    age: "Возраст", agePlaceholder: "Лет",
+    permission: "Я подтверждаю, что родитель или опекун дал разрешение этому наезднику (младше 18 лет) на участие.",
+    weight: "Весовая категория",
+    w1: "До 50 кг", w2: "50–70 кг", w3: "Более 70 кг",
+    wwTitle: "О наших лошадях",
+    wwBody: "Чтобы беречь спины наших лошадей, прогулки в седле — для наездников до 70 кг. Мы всё равно вам рады — у нас есть прекрасные занятия без седла:",
+    wwTag1: "🤝 Курс «шепчущего с лошадьми»", wwTag2: "🎯 Урок на корде", wwTag3: "🪮 Уход за лошадью",
+    wwBtn: "Посмотреть занятия без седла →",
+    experience: "Опыт верховой езды",
+    e1: "Никогда не ездил(а)", e2: "Начинающий", e3: "Средний", e4: "Продвинутый",
+    seeAvailability: "Посмотреть доступность →",
+    back: "← Назад",
+    available: "Доступно", selected: "Выбрано", unavailable: "Недоступно",
+    pickDate: "Выберите доступную дату выше, чтобы выбрать время.",
+    timeSlot: "Время", fullDay: "Весь день",
+    matchedHorses: "Подобранные лошади",
+    notesLabel: "Что-нибудь ещё? (необязательно)",
+    notesPlaceholder: "Аллергии, особые пожелания, вопросы…",
+    notice: "Это лишь предложения. Simone проверяет и подтверждает каждый запрос до окончательного бронирования.",
+    sendBtn: "Отправить запрос в WhatsApp →",
+    noAvailTitle: "Сейчас нет доступных дат",
+    noAvailBody: "На нужную вам дату или время нет мест для вашей группы. Напишите нам напрямую в WhatsApp — мы постараемся помочь.",
+    waBtn: "Написать нам в WhatsApp",
+    sentTitle1: "Запрос отправлен", sentTitle2: "Simone",
+    sentSub: "Ваш запрос открылся в WhatsApp — просто нажмите «отправить». Simone проверит подобранных лошадей и подтвердит, обычно в течение нескольких часов.",
+    sActivity: "Занятие", sDuration: "Длительность", sDateTime: "Дата и время", sRiders: "Наездники", sStatus: "Статус",
+    awaiting: "⏳ Ожидает подтверждения",
+    person: "чел.", people: "чел.",
+    pending: "(на подтверждении)",
+    another: "Сделать ещё одну бронь",
+    activities: {
+      beach: "Прогулка к пляжу и рисовым полям", photo: "Фотосессия",
+      whisper: "Курс «шепчущего с лошадьми»", joinup: "Урок Join Up", lunge: "Урок на корде",
+    },
+    categories: { "Rides": "Прогулки", "Photoshoots": "Фотосессии", "Off Saddle Activities": "Без седла" },
+  },
+};
+
+// Weight / experience option values are stored as canonical English keys so the
+// matching logic never depends on the chosen language.
+const WEIGHT_KEYS = ["w1","w2","w3"];
+const EXPERIENCE_KEYS = ["e1","e2","e3","e4"];
+
+function weightClass(key) {
+  if (key === "w1") return "<50";
+  if (key === "w2") return "<70";
+  return ">70";
+}
+function experienceClass(key) {
+  if (key === "e1" || key === "e2") return "Beginner";
+  if (key === "e3") return "Intermediate";
+  return "Advanced";
+}
+const EXP_RANK = { Beginner: 0, Intermediate: 1, Advanced: 2 };
+
+function matchHorses(riders) {
+  return riders.map(r => {
+    const ec = experienceClass(r.experience);
+    return HORSES.filter(h => {
+      const wMap = { "<50": 50, "<70": 70, ">70": 200 };
+      const rMap = { "w1": 49, "w2": 65, "w3": 80 };
+      const horseMax = wMap[h.weightClass];
+      const riderWeight = rMap[r.weight];
+      return riderWeight <= horseMax && EXP_RANK[h.experience] <= EXP_RANK[ec];
+    });
+  });
+}
+function getSharedAvailableDates(selectedHorseIds) {
+  if (!selectedHorseIds.length) return [];
+  const sets = selectedHorseIds.map(id => new Set(HORSES.find(h => h.id === id)?.available || []));
+  return [...sets[0]].filter(d => sets.every(s => s.has(d)));
+}
+
+// ─── STYLES ──────────────────────────────────────────────────────────────────
+
+const css = `
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400;1,600&family=Outfit:wght@300;400;500;600&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { background: #0e0b08; }
+
+:root {
+  --sand: #f5ede0;
+  --earth: #2a1f14;
+  --bark: #4a3728;
+  --clay: #c8784a;
+  --dusk: #7a6652;
+  --cream: #faf6f0;
+  --fog:   #e8ddd0;
+  --leaf:  #4a7c4a;
+}
+
+.app {
+  font-family: 'Outfit', sans-serif;
+  max-width: 430px;
+  margin: 0 auto;
+  min-height: 100vh;
+  background: var(--cream);
+  position: relative;
+  overflow: hidden;
+}
+
+/* ── HERO HEADER ── */
+.hero {
+  background: var(--earth);
+  padding: 22px 24px 22px;
+  position: relative;
+  overflow: hidden;
+}
+.hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 80% 0%, #c8784a33 0%, transparent 60%);
+  pointer-events: none;
+}
+.lang-switch {
+  display: flex;
+  gap: 5px;
+  justify-content: flex-end;
+  margin-bottom: 14px;
+  position: relative;
+  z-index: 2;
+}
+.lang-btn {
+  padding: 5px 12px;
+  border: 1px solid rgba(245,237,224,0.22);
+  background: transparent;
+  color: rgba(245,237,224,0.55);
+  border-radius: 20px;
+  font-size: 11px;
+  font-family: 'Outfit', sans-serif;
+  font-weight: 500;
+  letter-spacing: 0.6px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.lang-btn:hover { color: var(--sand); border-color: rgba(245,237,224,0.4); }
+.lang-btn.active { background: var(--clay); border-color: var(--clay); color: #fff; }
+.hero-eyebrow {
+  font-size: 10px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--clay);
+  margin-bottom: 6px;
+  font-weight: 500;
+  position: relative;
+}
+.hero-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 28px;
+  color: var(--sand);
+  font-style: italic;
+  line-height: 1.15;
+  margin-bottom: 4px;
+  position: relative;
+}
+.hero-sub {
+  font-size: 12px;
+  color: rgba(245,237,224,0.45);
+  letter-spacing: 0.3px;
+  position: relative;
+}
+
+/* ── STEP INDICATOR ── */
+.steps {
+  display: flex;
+  align-items: center;
+  padding: 16px 24px;
+  gap: 0;
+  background: var(--earth);
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+.step-dot {
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 600;
+  border: 1.5px solid rgba(245,237,224,0.2);
+  color: rgba(245,237,224,0.3);
+  flex-shrink: 0;
+  transition: all 0.3s;
+}
+.step-dot.done   { background: var(--clay); border-color: var(--clay); color: #fff; }
+.step-dot.active { background: transparent; border-color: var(--clay); color: var(--clay); }
+.step-line {
+  flex: 1; height: 1px;
+  background: rgba(245,237,224,0.1);
+  transition: background 0.3s;
+}
+.step-line.done { background: var(--clay); }
+
+/* ── BODY ── */
+.body { padding: 24px; }
+
+.section-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 22px;
+  font-style: italic;
+  color: var(--earth);
+  margin-bottom: 4px;
+}
+.section-hint {
+  font-size: 12px;
+  color: var(--dusk);
+  margin-bottom: 20px;
+  line-height: 1.5;
+}
+
+/* ── ACTIVITY GRID ── */
+.act-category {
+  font-size: 10px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--dusk);
+  margin-bottom: 10px;
+  margin-top: 18px;
+  font-weight: 500;
+}
+.act-category:first-child { margin-top: 0; }
+
+.act-card {
+  background: #fff;
+  border: 1.5px solid var(--fog);
+  border-radius: 14px;
+  padding: 14px 16px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.act-card:hover   { border-color: var(--clay); box-shadow: 0 4px 14px rgba(200,120,74,0.1); }
+.act-card.selected{ border-color: var(--clay); background: #fff8f4; }
+.act-icon { font-size: 22px; width: 36px; text-align: center; flex-shrink: 0; }
+.act-name { font-size: 14px; font-weight: 500; color: var(--earth); }
+.act-meta { font-size: 11px; color: var(--dusk); margin-top: 2px; }
+.act-check {
+  margin-left: auto;
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  background: var(--clay);
+  color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px;
+  flex-shrink: 0;
+  opacity: 0;
+  transform: scale(0.6);
+  transition: all 0.2s;
+}
+.act-card.selected .act-check { opacity: 1; transform: scale(1); }
+
+/* ── OPTION PILLS ── */
+.pill-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+.pill {
+  padding: 9px 16px;
+  border: 1.5px solid var(--fog);
+  border-radius: 24px;
+  font-size: 13px;
+  cursor: pointer;
+  background: #fff;
+  color: var(--earth);
+  transition: all 0.18s;
+  font-family: 'Outfit', sans-serif;
+}
+.pill:hover    { border-color: var(--clay); }
+.pill.selected { background: var(--earth); border-color: var(--earth); color: var(--sand); }
+
+/* ── RIDER CARDS ── */
+.rider-card {
+  background: #fff;
+  border: 1.5px solid var(--fog);
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+.rider-label {
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--dusk);
+  margin-bottom: 14px;
+  font-weight: 500;
+}
+.rider-field { margin-bottom: 14px; }
+.rider-field:last-child { margin-bottom: 0; }
+.field-label {
+  font-size: 11px;
+  color: var(--dusk);
+  margin-bottom: 6px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+}
+.field-pills { display: flex; flex-wrap: wrap; gap: 6px; }
+.field-pill {
+  padding: 7px 13px;
+  border: 1.5px solid var(--fog);
+  border-radius: 20px;
+  font-size: 12px;
+  cursor: pointer;
+  background: #fff;
+  color: var(--earth);
+  transition: all 0.15s;
+  font-family: 'Outfit', sans-serif;
+}
+.field-pill:hover    { border-color: var(--clay); }
+.field-pill.selected { background: var(--earth); border-color: var(--earth); color: var(--sand); }
+
+/* ── TEXT INPUTS ── */
+.text-input {
+  width: 100%;
+  padding: 11px 13px;
+  border: 1.5px solid var(--fog);
+  border-radius: 10px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 14px;
+  color: var(--earth);
+  background: #fff;
+  outline: none;
+  transition: border 0.18s;
+}
+.text-input:focus { border-color: var(--clay); }
+.text-input::placeholder { color: #c4b8a8; }
+.field-2col { display: grid; grid-template-columns: 1fr 88px; gap: 10px; }
+
+/* ── PERMISSION (UNDER 18) ── */
+.perm-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin-top: 10px;
+  padding: 11px 12px;
+  background: #fff8f4;
+  border: 1.5px solid #f0d5c0;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.perm-box {
+  width: 20px; height: 20px;
+  border-radius: 6px;
+  border: 1.5px solid var(--clay);
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: #fff;
+  margin-top: 1px;
+  font-size: 12px;
+  color: #fff;
+  transition: all 0.15s;
+}
+.perm-box.checked { background: var(--clay); }
+.perm-text { font-size: 12px; color: #9a5a30; line-height: 1.5; }
+
+/* ── NOTES ── */
+.notes-area {
+  width: 100%;
+  min-height: 84px;
+  padding: 12px 14px;
+  border: 1.5px solid var(--fog);
+  border-radius: 12px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 14px;
+  color: var(--earth);
+  background: #fff;
+  outline: none;
+  resize: vertical;
+  line-height: 1.5;
+  transition: border 0.18s;
+  margin-bottom: 16px;
+}
+.notes-area:focus { border-color: var(--clay); }
+.notes-area::placeholder { color: #c4b8a8; }
+
+/* ── CTA ── */
+.cta {
+  width: 100%;
+  padding: 16px;
+  background: var(--clay);
+  color: #fff;
+  border: none;
+  border-radius: 14px;
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic;
+  font-size: 18px;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.1s;
+  margin-top: 8px;
+}
+.cta:hover   { background: #b5663a; }
+.cta:active  { transform: scale(0.99); }
+.cta:disabled{ background: #c8b5a0; cursor: not-allowed; }
+
+.back-link {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--dusk);
+  cursor: pointer;
+  margin-bottom: 20px;
+  width: fit-content;
+}
+.back-link:hover { color: var(--earth); }
+
+/* ── CALENDAR SCREEN ── */
+.cal-header {
+  background: var(--earth);
+  padding: 20px 24px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.cal-month {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 18px;
+  color: var(--sand);
+  font-style: italic;
+}
+.cal-nav {
+  background: none;
+  border: 1px solid rgba(245,237,224,0.2);
+  color: var(--sand);
+  width: 30px; height: 30px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s;
+}
+.cal-nav:hover { background: rgba(245,237,224,0.1); }
+
+.cal-grid {
+  padding: 16px 24px;
+  background: var(--earth);
+}
+.cal-days-header {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  margin-bottom: 8px;
+}
+.cal-day-name {
+  text-align: center;
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: rgba(245,237,224,0.3);
+  padding: 4px 0;
+}
+.cal-days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 3px;
+}
+.cal-day {
+  aspect-ratio: 1;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 400;
+  cursor: default;
+  color: rgba(245,237,224,0.2);
+  position: relative;
+}
+.cal-day.available {
+  color: var(--sand);
+  cursor: pointer;
+  background: rgba(200,120,74,0.15);
+  border: 1px solid rgba(200,120,74,0.3);
+}
+.cal-day.available:hover { background: rgba(200,120,74,0.3); }
+.cal-day.selected {
+  background: var(--clay) !important;
+  color: #fff !important;
+  border-color: var(--clay) !important;
+}
+
+.cal-legend {
+  padding: 12px 24px;
+  background: var(--earth);
+  display: flex;
+  gap: 16px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+.legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: rgba(245,237,224,0.4); }
+.legend-dot {
+  width: 10px; height: 10px;
+  border-radius: 3px;
+}
+
+.cal-selection-panel {
+  padding: 20px 24px;
+}
+.sel-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 18px;
+  font-style: italic;
+  color: var(--earth);
+  margin-bottom: 14px;
+}
+.time-cards { display: flex; gap: 10px; margin-bottom: 20px; }
+.time-card {
+  flex: 1;
+  padding: 14px;
+  background: #fff;
+  border: 1.5px solid var(--fog);
+  border-radius: 12px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.18s;
+}
+.time-card:hover    { border-color: var(--clay); }
+.time-card.selected { background: var(--earth); border-color: var(--earth); }
+.time-card.selected .time-main { color: var(--sand); }
+.time-card.selected .time-sub  { color: rgba(245,237,224,0.5); }
+.time-main { font-size: 16px; font-weight: 500; color: var(--earth); }
+.time-sub  { font-size: 11px; color: var(--dusk); margin-top: 2px; }
+
+.match-preview {
+  background: #fff;
+  border: 1.5px solid var(--fog);
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+.match-preview-title {
+  font-size: 10px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--dusk);
+  margin-bottom: 12px;
+  font-weight: 500;
+}
+.match-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--fog);
+}
+.match-row:last-child { border-bottom: none; padding-bottom: 0; }
+.match-horse-avatar {
+  width: 36px; height: 36px;
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+.match-info { flex: 1; }
+.match-horse-name { font-size: 14px; font-weight: 500; color: var(--earth); }
+.match-rider-name { font-size: 11px; color: var(--dusk); }
+.match-tag {
+  font-size: 10px;
+  padding: 3px 8px;
+  border-radius: 20px;
+  background: #f0ece5;
+  color: var(--dusk);
+}
+
+.notice {
+  background: #fff8f4;
+  border: 1px solid #f0d5c0;
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 12px;
+  color: #9a5a30;
+  line-height: 1.5;
+  margin-bottom: 16px;
+  display: flex;
+  gap: 8px;
+}
+
+/* ── CONFIRM SCREEN ── */
+.confirm-screen {
+  padding: 36px 24px;
+  text-align: center;
+}
+.confirm-icon { font-size: 54px; margin-bottom: 16px; }
+.confirm-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 26px;
+  font-style: italic;
+  color: var(--earth);
+  margin-bottom: 8px;
+}
+.confirm-sub {
+  font-size: 13px;
+  color: var(--dusk);
+  line-height: 1.65;
+  margin-bottom: 28px;
+}
+.confirm-summary {
+  background: #fff;
+  border: 1.5px solid var(--fog);
+  border-radius: 14px;
+  padding: 18px;
+  text-align: left;
+  margin-bottom: 24px;
+}
+.sum-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 7px 0;
+  font-size: 13px;
+  border-bottom: 1px solid var(--fog);
+}
+.sum-row:last-child { border-bottom: none; }
+.sum-key { color: var(--dusk); }
+.sum-val { color: var(--earth); font-weight: 500; text-align: right; max-width: 60%; }
+
+/* ── WEIGHT WARNING BANNER ── */
+.weight-warning {
+  background: #fffaf5;
+  border: 1.5px solid #f0d5b0;
+  border-radius: 14px;
+  padding: 16px;
+  margin-top: 10px;
+  animation: fadeUp 0.25s ease both;
+}
+.ww-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.ww-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.ww-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 15px;
+  font-weight: 600;
+  color: #7a4a1a;
+  margin-bottom: 4px;
+}
+.ww-body {
+  font-size: 12.5px;
+  color: #9a6030;
+  line-height: 1.6;
+}
+.ww-acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 12px;
+}
+.ww-act-tag {
+  padding: 5px 11px;
+  background: #fff0de;
+  border: 1px solid #f0d5b0;
+  border-radius: 20px;
+  font-size: 11.5px;
+  color: #7a4a1a;
+  font-weight: 500;
+}
+.ww-btn {
+  width: 100%;
+  padding: 12px;
+  background: #c8784a;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  transition: background 0.2s;
+}
+.ww-btn:hover { background: #b5663a; }
+
+/* ── NO AVAILABILITY MODAL ── */
+.no-avail-modal {
+  margin: 0 24px 20px;
+  background: var(--earth);
+  border-radius: 16px;
+  padding: 20px;
+  animation: fadeUp 0.3s ease both;
+}
+.no-avail-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.no-avail-icon { font-size: 24px; flex-shrink: 0; }
+.no-avail-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 17px;
+  font-style: italic;
+  color: var(--sand);
+  margin-bottom: 4px;
+}
+.no-avail-body {
+  font-size: 12px;
+  color: rgba(245,237,224,0.55);
+  line-height: 1.6;
+}
+.wa-btn {
+  width: 100%;
+  padding: 13px;
+  background: #25D366;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: background 0.2s;
+  letter-spacing: 0.2px;
+}
+.wa-btn:hover { background: #1ebe5a; }
+.wa-icon { font-size: 18px; }
+
+/* ── ANIMATIONS ── */
+@keyframes fadeUp {
+  from { opacity:0; transform:translateY(14px); }
+  to   { opacity:1; transform:translateY(0); }
+}
+.fu  { animation: fadeUp 0.3s ease both; }
+.fu2 { animation: fadeUp 0.3s 0.07s ease both; }
+.fu3 { animation: fadeUp 0.3s 0.14s ease both; }
+.fu4 { animation: fadeUp 0.3s 0.21s ease both; }
+`;
+
+// ─── HELPERS ────────────────────────────────────────────────────────────────
+
+function getDaysInMonth(year, month) { return new Date(year, month + 1, 0).getDate(); }
+function getFirstDay(year, month) { return new Date(year, month, 1).getDay(); }
+const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const DAY_NAMES = ["Su","Mo","Tu","We","Th","Fr","Sa"];
+
+// Build the WhatsApp message that lands in Simone's inbox (always English).
+function buildWhatsAppMessage({ actObj, durationLabel, formattedDate, selectedTime, numPeople, matches, notes }) {
+  const lines = [];
+  lines.push("🐴 *New booking request — Salty Cowboys*");
+  lines.push("");
+  if (actObj) lines.push("Activity: " + T.en.activities[actObj.id] + (durationLabel ? " (" + durationLabel + ")" : ""));
+  if (formattedDate) lines.push("Date & time: " + formattedDate + (selectedTime ? " · " + selectedTime : ""));
+  lines.push("Group size: " + numPeople);
+  lines.push("");
+  lines.push("*Riders:*");
+  matches.forEach((m, i) => {
+    const r = m.rider;
+    const ageNum = parseInt(r.age, 10);
+    const parts = [];
+    const who = (r.name && r.name.trim()) ? r.name.trim() : ("Rider " + (i + 1));
+    let line = "• " + who;
+    if (r.age) line += ", age " + r.age;
+    parts.push(T.en[r.experience]); // experience label in English
+    if (!actObj?.offSaddle && r.weight) parts.push(T.en[r.weight]);
+    line += " — " + parts.join(", ");
+    if (m.horse) line += " → suggested: " + m.horse.emoji + " " + m.horse.name;
+    if (!isNaN(ageNum) && ageNum < 18) line += " (parent/guardian permission confirmed)";
+    lines.push(line);
+  });
+  lines.push("");
+  lines.push("Notes: " + (notes && notes.trim() ? notes.trim() : "—"));
+  lines.push("");
+  lines.push("_Sent from the online booking page · pending Simone's approval_");
+  return lines.join("\n");
+}
+
+function openWhatsApp(message) {
+  const url = "https://wa.me/" + WA_NUMBER + "?text=" + encodeURIComponent(message);
+  window.open(url, "_blank");
+}
+
+// ─── MAIN COMPONENT ──────────────────────────────────────────────────────────
+
+function App() {
+  const [lang, setLang] = useState("en");
+  const t = T[lang];
+
+  const [screen, setScreen] = useState("activity"); // activity | riders | calendar | confirm
+  const [activity, setActivity] = useState(null);
+  const [duration, setDuration] = useState(null);
+  const [numPeople, setNumPeople] = useState(null);
+  const [riders, setRiders] = useState([]);
+  const [calMonth, setCalMonth] = useState(4); // May (0-indexed)
+  const [calYear, setCalYear] = useState(2026);
+  const [selectedDate, setSelectedDate] = useState(null);
+  const [selectedTime, setSelectedTime] = useState(null);
+  const [horseMatches, setHorseMatches] = useState([]);
+  const [availableDates, setAvailableDates] = useState([]);
+  const [notes, setNotes] = useState("");
+
+  const actObj = ALL_ACTIVITIES.find(a => a.id === activity);
+  const isOffSaddle = actObj?.offSaddle === true;
+
+  useEffect(() => {
+    if (riders.length && riders.every(r => r.weight && r.experience)) {
+      const riderMatches = matchHorses(riders);
+      const assigned = [];
+      const usedIds = new Set();
+      let possible = true;
+      for (let i = 0; i < riderMatches.length; i++) {
+        const avail = riderMatches[i].filter(h => !usedIds.has(h.id));
+        if (!avail.length) { possible = false; break; }
+        assigned.push({ rider: riders[i], horse: avail[0] });
+        usedIds.add(avail[0].id);
+      }
+      if (possible) {
+        setHorseMatches(assigned);
+        setAvailableDates(getSharedAvailableDates(assigned.map(a => a.horse.id)));
+      } else {
+        setHorseMatches([]);
+        setAvailableDates([]);
+      }
+    } else {
+      setHorseMatches([]);
+      setAvailableDates([]);
+    }
+  }, [riders]);
+
+  function initRiders(n) {
+    const count = n === "5+" ? 5 : parseInt(n);
+    setRiders(Array.from({ length: count }, (_, i) => ({
+      id: i,
+      label: count === 1 ? t.rider : t.rider + " " + (i + 1),
+      name: "", age: "", permission: false,
+      weight: "", experience: "",
+    })));
+    setNumPeople(n);
+  }
+  function updateRider(idx, field, val) {
+    setRiders(prev => prev.map((r, i) => i === idx ? { ...r, [field]: val } : r));
+  }
+
+  function resetAll() {
+    setScreen("activity"); setActivity(null); setDuration(null);
+    setNumPeople(null); setRiders([]); setSelectedDate(null);
+    setSelectedTime(null); setHorseMatches([]); setNotes("");
+  }
+
+  const step = screen === "activity" ? 1 : screen === "riders" ? 2 : screen === "calendar" ? 3 : 4;
+
+  const ridersComplete = riders.length > 0 && riders.every(r => {
+    const ageNum = parseInt(r.age, 10);
+    const ageOk = r.age !== "" && !isNaN(ageNum) && ageNum > 0 && ageNum < 120;
+    const minorOk = isNaN(ageNum) || ageNum >= 18 || r.permission;
+    return r.name.trim() && ageOk && (isOffSaddle || r.weight) && r.experience && minorOk;
+  });
+
+  const daysInMonth = getDaysInMonth(calYear, calMonth);
+  const firstDay = getFirstDay(calYear, calMonth);
+  const availableSet = new Set(availableDates);
+  function handleDayClick(day) {
+    if (!availableSet.has(day)) return;
+    setSelectedDate(day);
+    setSelectedTime(null);
+  }
+
+  const formattedDate = selectedDate ? MONTHS[calMonth] + " " + selectedDate + ", " + calYear : null;
+
+  function handleSend() {
+    const message = buildWhatsAppMessage({
+      actObj, durationLabel: duration, formattedDate, selectedTime,
+      numPeople, matches: horseMatches, notes,
+    });
+    openWhatsApp(message);
+    setScreen("confirm");
+  }
+
+  function handleNoAvailWhatsApp() {
+    const message = buildWhatsAppMessage({
+      actObj, durationLabel: duration, formattedDate: null, selectedTime: null,
+      numPeople, matches: horseMatches.length ? horseMatches : riders.map(r => ({ rider: r, horse: null })),
+      notes,
+    }) + "\n\n(Couldn't find availability online — please advise.)";
+    openWhatsApp(message);
+  }
+
+  return (
+    <>
+      <style>{css}</style>
+      <div className="app">
+        <div className="hero">
+          <div className="lang-switch">
+            {LANGS.map(l => (
+              <button
+                key={l.code}
+                className={"lang-btn " + (lang === l.code ? "active" : "")}
+                onClick={() => setLang(l.code)}
+              >{l.label}</button>
+            ))}
+          </div>
+          <div className="hero-eyebrow">Salty Cowboys · Bali</div>
+          <div className="hero-title">{t.heroTitle1}<br />{t.heroTitle2}</div>
+          <div className="hero-sub">{t.heroSub}</div>
+        </div>
+
+        {screen !== "confirm" && (
+          <div className="steps">
+            {[1, 2, 3].map((s, i) => (
+              <React.Fragment key={s}>
+                <div className={"step-dot " + (step > s ? "done" : step === s ? "active" : "")}>
+                  {step > s ? "✓" : s}
+                </div>
+                {i < 2 && <div className={"step-line " + (step > s ? "done" : "")} />}
+              </React.Fragment>
+            ))}
+          </div>
+        )}
+
+        {/* ── ACTIVITY ── */}
+        {screen === "activity" && (
+          <div className="body fu">
+            <h2 className="section-title">{t.chooseActivity}</h2>
+            <p className="section-hint">{t.chooseActivityHint}</p>
+            {ACTIVITIES.map(cat => (
+              <div key={cat.category}>
+                <div className="act-category">{t.categories[cat.category]}</div>
+                {cat.items.map(item => (
+                  <div
+                    key={item.id}
+                    className={"act-card " + (activity === item.id ? "selected" : "")}
+                    onClick={() => { setActivity(item.id); setDuration(null); }}
+                  >
+                    <div className="act-icon">{item.icon}</div>
+                    <div>
+                      <div className="act-name">{t.activities[item.id]}</div>
+                      <div className="act-meta">{item.slots.join(" · ")} · {item.durations.join(", ")}</div>
+                    </div>
+                    <div className="act-check">✓</div>
+                  </div>
+                ))}
+              </div>
+            ))}
+            {activity && (
+              <div className="fu2">
+                <div className="act-category" style={{ marginTop: 20 }}>{t.duration}</div>
+                <div className="pill-row">
+                  {actObj.durations.map(d => (
+                    <button key={d} className={"pill " + (duration === d ? "selected" : "")} onClick={() => setDuration(d)}>{d}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {activity && duration && (
+              <div className="fu3">
+                <div className="act-category">{t.numPeople}</div>
+                <div className="pill-row">
+                  {PEOPLE_OPTIONS.map(n => (
+                    <button key={n} className={"pill " + (numPeople === n ? "selected" : "")} onClick={() => initRiders(n)}>{n}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {activity && duration && numPeople && (
+              <button className="cta fu4" onClick={() => setScreen("riders")}>{t.continue}</button>
+            )}
+          </div>
+        )}
+
+        {/* ── RIDERS ── */}
+        {screen === "riders" && (
+          <div className="body fu">
+            <div className="back-link" onClick={() => setScreen("activity")}>{t.back}</div>
+            <h2 className="section-title">{riders.length === 1 ? t.aboutYou : t.aboutRiders}</h2>
+            <p className="section-hint">
+              {t.matchHint}{riders.length > 1 ? " " + riders.length + " · " + t.activities[actObj?.id] : " " + t.activities[actObj?.id]}
+            </p>
+            {riders.map((rider, idx) => {
+              const ageNum = parseInt(rider.age, 10);
+              const isMinor = !isNaN(ageNum) && ageNum > 0 && ageNum < 18;
+              return (
+                <div key={rider.id} className="rider-card fu" style={{ animationDelay: (idx * 0.06) + "s" }}>
+                  <div className="rider-label">{riders.length === 1 ? t.yourDetails : rider.label}</div>
+
+                  <div className="rider-field">
+                    <div className="field-2col">
+                      <div>
+                        <div className="field-label">{t.name}</div>
+                        <input
+                          className="text-input"
+                          type="text"
+                          value={rider.name}
+                          placeholder={t.namePlaceholder}
+                          onChange={e => updateRider(idx, "name", e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <div className="field-label">{t.age}</div>
+                        <input
+                          className="text-input"
+                          type="number"
+                          inputMode="numeric"
+                          min="1"
+                          value={rider.age}
+                          placeholder={t.agePlaceholder}
+                          onChange={e => updateRider(idx, "age", e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    {isMinor && (
+                      <div className="perm-row" onClick={() => updateRider(idx, "permission", !rider.permission)}>
+                        <div className={"perm-box " + (rider.permission ? "checked" : "")}>{rider.permission ? "✓" : ""}</div>
+                        <div className="perm-text">{t.permission}</div>
+                      </div>
+                    )}
+                  </div>
+
+                  {!isOffSaddle && (
+                    <div className="rider-field">
+                      <div className="field-label">{t.weight}</div>
+                      <div className="field-pills">
+                        {WEIGHT_KEYS.map(w => (
+                          <button key={w} className={"field-pill " + (rider.weight === w ? "selected" : "")} onClick={() => updateRider(idx, "weight", w)}>{t[w]}</button>
+                        ))}
+                      </div>
+                      {rider.weight === "w3" && (
+                        <div className="weight-warning">
+                          <div className="ww-header">
+                            <div className="ww-icon">🐴</div>
+                            <div>
+                              <div className="ww-title">{t.wwTitle}</div>
+                              <div className="ww-body">{t.wwBody}</div>
+                            </div>
+                          </div>
+                          <div className="ww-acts">
+                            <span className="ww-act-tag">{t.wwTag1}</span>
+                            <span className="ww-act-tag">{t.wwTag2}</span>
+                            <span className="ww-act-tag">{t.wwTag3}</span>
+                          </div>
+                          <button className="ww-btn" onClick={() => { resetAll(); }}>{t.wwBtn}</button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="rider-field">
+                    <div className="field-label">{t.experience}</div>
+                    <div className="field-pills">
+                      {EXPERIENCE_KEYS.map(e => (
+                        <button key={e} className={"field-pill " + (rider.experience === e ? "selected" : "")} onClick={() => updateRider(idx, "experience", e)}>{t[e]}</button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+            <button className="cta" disabled={!ridersComplete} onClick={() => setScreen("calendar")}>{t.seeAvailability}</button>
+          </div>
+        )}
+
+        {/* ── CALENDAR ── */}
+        {screen === "calendar" && (
+          <div className="fu">
+            <div className="back-link" style={{ padding: "16px 24px 0" }} onClick={() => setScreen("riders")}>{t.back}</div>
+            <div className="cal-header">
+              <button className="cal-nav" onClick={() => {
+                if (calMonth === 0) { setCalMonth(11); setCalYear(y => y - 1); } else setCalMonth(m => m - 1);
+              }}>‹</button>
+              <div className="cal-month">{MONTHS[calMonth]} {calYear}</div>
+              <button className="cal-nav" onClick={() => {
+                if (calMonth === 11) { setCalMonth(0); setCalYear(y => y + 1); } else setCalMonth(m => m + 1);
+              }}>›</button>
+            </div>
+            <div className="cal-grid">
+              <div className="cal-days-header">
+                {DAY_NAMES.map(d => <div key={d} className="cal-day-name">{d}</div>)}
+              </div>
+              <div className="cal-days">
+                {Array.from({ length: firstDay }).map((_, i) => <div key={"e" + i} className="cal-day" />)}
+                {Array.from({ length: daysInMonth }).map((_, i) => {
+                  const day = i + 1;
+                  const isAvail = availableSet.has(day);
+                  const isSel = selectedDate === day;
+                  return (
+                    <div key={day} className={"cal-day " + (isAvail ? "available" : "") + " " + (isSel ? "selected" : "")} onClick={() => handleDayClick(day)}>{day}</div>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="cal-legend">
+              <div className="legend-item"><div className="legend-dot" style={{ background: "rgba(200,120,74,0.4)", border: "1px solid rgba(200,120,74,0.5)" }} />{t.available}</div>
+              <div className="legend-item"><div className="legend-dot" style={{ background: "var(--clay)" }} />{t.selected}</div>
+              <div className="legend-item"><div className="legend-dot" style={{ background: "rgba(245,237,224,0.08)" }} />{t.unavailable}</div>
+            </div>
+
+            {availableDates.length === 0 && (
+              <div className="no-avail-modal">
+                <div className="no-avail-top">
+                  <div className="no-avail-icon">🗓️</div>
+                  <div>
+                    <div className="no-avail-title">{t.noAvailTitle}</div>
+                    <div className="no-avail-body">{t.noAvailBody}</div>
+                  </div>
+                </div>
+                <button className="wa-btn" onClick={handleNoAvailWhatsApp}>
+                  <span className="wa-icon">💬</span>{t.waBtn}
+                </button>
+              </div>
+            )}
+
+            <div className="cal-selection-panel">
+              {availableDates.length > 0 && !selectedDate && (
+                <p style={{ fontSize: 13, color: "var(--dusk)", lineHeight: 1.6 }}>{t.pickDate}</p>
+              )}
+              {selectedDate && (
+                <>
+                  <div className="sel-title">{MONTHS[calMonth]} {selectedDate}</div>
+                  <div className="act-category" style={{ marginTop: 0, marginBottom: 10 }}>{t.timeSlot}</div>
+                  <div className="time-cards">
+                    {actObj.slots.map(slot => (
+                      <div key={slot} className={"time-card " + (selectedTime === slot ? "selected" : "")} onClick={() => setSelectedTime(slot)}>
+                        <div className="time-main">{slot}</div>
+                        <div className="time-sub">{actObj.durations.length === 1 && actObj.durations[0] === "10hr" ? t.fullDay : duration}</div>
+                      </div>
+                    ))}
+                  </div>
+                  {horseMatches.length > 0 && (
+                    <div className="match-preview fu2">
+                      <div className="match-preview-title">{t.matchedHorses}</div>
+                      {horseMatches.map((m, i) => (
+                        <div key={i} className="match-row">
+                          <div className="match-horse-avatar" style={{ background: m.horse.color + "22" }}>{m.horse.emoji}</div>
+                          <div className="match-info">
+                            <div className="match-horse-name">{m.horse.name}</div>
+                            <div className="match-rider-name">{(m.rider.name && m.rider.name.trim()) || m.rider.label} · {t[m.rider.experience]}</div>
+                          </div>
+                          {!isOffSaddle && m.rider.weight && <div className="match-tag">{t[m.rider.weight]}</div>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="act-category" style={{ marginTop: 0 }}>{t.notesLabel}</div>
+                  <textarea
+                    className="notes-area"
+                    value={notes}
+                    placeholder={t.notesPlaceholder}
+                    onChange={e => setNotes(e.target.value)}
+                  />
+
+                  <div className="notice">
+                    <span>🌿</span>
+                    <span>{t.notice}</span>
+                  </div>
+                  <button className="cta" disabled={!selectedTime} onClick={handleSend}>{t.sendBtn}</button>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── CONFIRM ── */}
+        {screen === "confirm" && (
+          <div className="confirm-screen fu">
+            <div className="confirm-icon">🌺</div>
+            <h2 className="confirm-title">{t.sentTitle1}<br />{t.sentTitle2}</h2>
+            <p className="confirm-sub">{t.sentSub}</p>
+            <div className="confirm-summary">
+              <div className="sum-row"><span className="sum-key">{t.sActivity}</span><span className="sum-val">{t.activities[actObj?.id]}</span></div>
+              <div className="sum-row"><span className="sum-key">{t.sDuration}</span><span className="sum-val">{duration}</span></div>
+              <div className="sum-row"><span className="sum-key">{t.sDateTime}</span><span className="sum-val">{formattedDate} · {selectedTime}</span></div>
+              <div className="sum-row"><span className="sum-key">{t.sRiders}</span><span className="sum-val">{numPeople} {numPeople === "1" ? t.person : t.people}</span></div>
+              {horseMatches.map((m, i) => (
+                <div key={i} className="sum-row">
+                  <span className="sum-key">{(m.rider.name && m.rider.name.trim()) || m.rider.label}</span>
+                  <span className="sum-val">{m.horse.emoji} {m.horse.name} {t.pending}</span>
+                </div>
+              ))}
+              <div className="sum-row"><span className="sum-key">{t.sStatus}</span><span className="sum-val" style={{ color: "#c8784a" }}>{t.awaiting}</span></div>
+            </div>
+            <button className="cta" onClick={resetAll}>{t.another}</button>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App />);
+const loadingEl = document.getElementById('loading');
+if (loadingEl) {
+  requestAnimationFrame(() => {
+    loadingEl.style.transition = 'opacity 0.3s';
+    loadingEl.style.opacity = '0';
+    setTimeout(() => loadingEl.remove(), 320);
+  });
+}
+  </script>
+</body>
+</html>
